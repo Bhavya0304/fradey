@@ -1,17 +1,17 @@
-# fastapi==0.115.0
-# uvicorn[standard]==0.30.6
-# websockets==12.0
-# numpy==1.26.4
-# scipy==1.13.1
-# webrtcvad==2.0.10
-# soundfile==0.12.1
-# python-dotenv
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+websockets==12.0
+numpy==1.26.4
+scipy==1.13.1
+webrtcvad==2.0.10
+soundfile==0.12.1
+python-dotenv
 
-# faster-whisper==1.0.3
-# llama-cpp-python==0.2.90
+faster-whisper==1.0.3
+llama-cpp-python==0.2.90
 
 # # TTS fallback libs (optional)
-# pyttsx3==2.90
+pyttsx3==2.90
 
 # dev dependencies
 pyaudio==0.2.14
