@@ -1,6 +1,9 @@
+# tts.py
 import os, subprocess, tempfile, numpy as np, soundfile as sf
 from audio_utils import resample_to_8k
+import warnings
 
+# Prefer Piper binary if user set it (keeps your original binary usage)
 class PiperTTS:
     def __init__(self):
         self.piper_bin = os.getenv("PIPER_BIN", "")
@@ -18,17 +21,12 @@ class PiperTTS:
             if self.voice:
                 cmd += ["-m", self.voice]
             cmd += ["-f", outname, "-q"]
-            print(f"[PIPER_DEBUG] running: {' '.join(cmd)}")
             proc = subprocess.run(cmd, input=text.encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
-            print(f"[PIPER_DEBUG] rc={proc.returncode} stdout_len={len(proc.stdout)} stderr_len={len(proc.stderr)}")
-            if proc.stderr:
-                print(f"[PIPER_DEBUG] stderr snippet: {proc.stderr.decode('utf-8', 'ignore')[:2000]}")
             if proc.returncode != 0:
-                raise RuntimeError(f"Piper rc={proc.returncode}")
+                raise RuntimeError(f"Piper rc={proc.returncode} stderr={proc.stderr[:1000]}")
             pcm, sr = sf.read(outname, dtype="float32")
             if pcm.ndim > 1:
                 pcm = pcm[:,0]
-            print(f"[PIPER_DEBUG] read wav sr={sr} len={len(pcm)} min={pcm.min():.6f} max={pcm.max():.6f}")
             return resample_to_8k(pcm, sr)
         finally:
             try:
@@ -37,19 +35,43 @@ class PiperTTS:
             except Exception:
                 pass
 
+# If Piper not available, fall back to a GPU-capable Coqui/TTS model (better voice than silence)
+class CoquiTTS:
+    def __init__(self, model_name: str = "tts_models/en/vctk/vits"):
+        # lazy import to avoid heavy import unless used
+        try:
+            from TTS.api import TTS
+        except Exception as e:
+            raise RuntimeError("Coqui TTS package not installed or failed to load. Install with the provided setup script.") from e
+        # choose a relatively lightweight GPU-friendly model; VITS is high-quality and fast on GPU
+        self.tts = TTS(model_name, progress_bar=False, gpu=True)
+        self.sr = 22050  # model sample rate
+
+    def synth(self, text: str) -> np.ndarray:
+        # returns float32 array at 8k sample rate to match your pipeline
+        wav = self.tts.tts(text)
+        # wav is float32 in [-1,1]
+        return resample_to_8k(np.asarray(wav, dtype=np.float32), self.sr)
+
+
 class FallbackTTS:
-    # Super basic CPU TTS (dev only). Replace ASAP with Piper.
+    # Keep same return shape: float32 PCM sampled at 8k
     def synth(self, text: str):
-        import pyttsx3
-        engine = pyttsx3.init()
-        # pyttsx3 can't easily give PCM directly; here we just return silence.
-        # Replace with proper TTS if Piper unavailable.
         import numpy as np
-        return np.zeros(16000, dtype=np.float32)  # 1s of silence
+        # 1 second of silence at 8k
+        return np.zeros(8000, dtype=np.float32)
 
 def build_tts():
+    """
+    Tries Piper (binary) first, then Coqui TTS on GPU, then fallback.
+    """
+    try:
+        return CoquiTTS()
+        
+    except Exception as e:
+        print(f"[TTS] Piper not ready: {e}. Trying Coqui TTS (gpu)...")
     try:
         return PiperTTS()
     except Exception as e:
-        print(f"[TTS] Piper not ready: {e}. Using fallback silence.")
+        print(f"[TTS] Coqui TTS not ready: {e}. Using fallback silence.")
         return FallbackTTS()
