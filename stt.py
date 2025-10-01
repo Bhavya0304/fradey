@@ -3,7 +3,7 @@ from faster_whisper import WhisperModel
 from audio_utils import resample_to_16k, pcm16_from_f32
 
 class STTEngine:
-    def __init__(self, model_size="tiny", device="cpu", compute_type="int8"):
+    def __init__(self, model_size="tiny", device="cuda", compute_type="float16"):
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
 
     def transcribe_chunk(self, pcm_f32_8k: np.ndarray, lang="en"):

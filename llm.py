@@ -6,7 +6,7 @@ class LLMEngine:
     Tiny local model for IVR. Use a small GGUF (TinyLlama 1.1B chat or Phi-2 gguf).
     Set env LLAMA_MODEL=/path/to/model.gguf
     """
-    def __init__(self, ctx_size=2048, n_gpu_layers=0):
+    def __init__(self, ctx_size=2048, n_gpu_layers=20):
         model_path = os.getenv("LLAMA_MODEL", "")
         if not model_path or not os.path.exists(model_path):
             raise RuntimeError("Set LLAMA_MODEL to a valid GGUF path (TinyLlama/Phi)")

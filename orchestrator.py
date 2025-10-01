@@ -14,8 +14,8 @@ class Session:
         self.tts_q = queue.Queue(maxsize=16000)  # outgoing PCM f32 frames (8k)
         self.ctrl_q = queue.Queue()
         self.stop = threading.Event()
-        self.stt = STTEngine(model_size="small", device="cpu", compute_type="int8")
-        self.llm = LLMEngine(ctx_size=2048, n_gpu_layers=0)
+        self.stt = STTEngine(model_size="small", device="cuda", compute_type="float16")
+        self.llm = LLMEngine(ctx_size=2048, n_gpu_layers=20)
         self.tts = build_tts()
         self.partial_buf = []   # collect active speech
         self.lock = threading.Lock()
