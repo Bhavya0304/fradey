@@ -7,8 +7,8 @@ PY=python3
 echo "== runpod_setup: starting in $WORKDIR =="
 
 # basic apt packages
-sudo apt-get update
-sudo apt-get install -y git build-essential cmake pkg-config libsndfile1-dev libasound2-dev \
+apt-get update
+apt-get install -y git build-essential cmake pkg-config libsndfile1-dev libasound2-dev \
     libssl-dev libffi-dev python3-dev python3-venv wget unzip
 
 # quick GPU check
