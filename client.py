@@ -7,7 +7,7 @@ import sounddevice as sd
 import websockets
 from audio_utils import mulaw_encode, mulaw_decode, resample_to_8k, resample_to_16k
 
-SERVER = "ws://127.0.0.1:8082/stream?session_id="
+SERVER = "ws://157.157.221.29:23881/stream?session_id="
 FRAME_MS = 20
 TARGET_SR = 8000
 FRAME_SAMPLES = int(TARGET_SR * FRAME_MS / 1000)  # 160
@@ -145,7 +145,7 @@ async def run_client(session_id: str):
         # Start stream(s)
         if mode == "duplex":
             try:
-                stream = sd.Stream(device=13, samplerate=sr, blocksize=blocksize,
+                stream = sd.Stream(device=4, samplerate=sr, blocksize=blocksize,
                                    dtype='float32', channels=1, callback=duplex_callback)
                 stream.start()
             except Exception as e:
@@ -155,9 +155,9 @@ async def run_client(session_id: str):
 
         if mode == "separate":
             # input stream with callback pushing to send_q
-            in_stream = sd.InputStream(device=13, samplerate=in_sr or sr, blocksize=int((in_sr or sr) * FRAME_MS / 1000),
+            in_stream = sd.InputStream(device=4, samplerate=in_sr or sr, blocksize=int((in_sr or sr) * FRAME_MS / 1000),
                                        dtype='float32', channels=1, callback=input_callback)
-            out_stream = sd.OutputStream(device=13, samplerate=out_sr or sr, blocksize=int((out_sr or sr) * FRAME_MS / 1000),
+            out_stream = sd.OutputStream(device=4, samplerate=out_sr or sr, blocksize=int((out_sr or sr) * FRAME_MS / 1000),
                                          dtype='float32', channels=1, callback=output_callback)
             in_stream.start()
             out_stream.start()
@@ -195,7 +195,7 @@ async def run_client(session_id: str):
         await asyncio.gather(sender(), receiver())
 
 if __name__ == "__main__":
-    resp = requests.post("http://127.0.0.1:8082/handshake")
+    resp = requests.post("http://157.157.221.29:23881/handshake")
     sid = resp.json()["session_id"]
     print("Got session_id:", sid)
     try:

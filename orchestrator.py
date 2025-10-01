@@ -41,13 +41,13 @@ class Session:
             except queue.Empty:
                 continue
             rms = math.sqrt((frame.astype('float32')**2).mean())
-            # print(f"[session {self.session_id}] frame_rms={rms:.5f}")        
+            print(f"[session {self.session_id}] frame_rms={rms:.5f}")        
             # VAD expects 16-bit bytes for the frame
             frame_pcm16 = (np.clip(frame, -1, 1) * 32767).astype(np.int16).tobytes()
             speech, speaking, segment_done = self.vad.update(frame_pcm16)
             # DEBUG: print vad state occasionally
-            # if len(self.partial_buf) % 50 == 0:  # not to spam, only occasional
-            #     print(f"[session {self.session_id}] vad: speech={speech} speaking={speaking} segment_done={segment_done} partial_buf_len={len(self.partial_buf)}")
+            if len(self.partial_buf) % 50 == 0:  # not to spam, only occasional
+                print(f"[session {self.session_id}] vad: speech={speech} speaking={speaking} segment_done={segment_done} partial_buf_len={len(self.partial_buf)}")
 
 
             if speech:
