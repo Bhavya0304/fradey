@@ -17,3 +17,5 @@ python-dotenv
 pyaudio
 sounddevice
 
+
+hf_transfer

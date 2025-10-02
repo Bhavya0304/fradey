@@ -9,12 +9,12 @@ class Session:
     def __init__(self, session_id: str):
         self.session_id = session_id
         self.in_sr = 8000
-        self.vad = VADGate(sample_rate=8000, aggressiveness=2, pause_ms=200)
-        self.in_q = queue.Queue(maxsize=16000)   # incoming PCM f32 frames (20ms @ 8k -> 160 samples)
+        self.vad = VADGate(sample_rate=8000, aggressiveness=0, pause_ms=600)
+        self.in_q = queue.Queue(maxsize=200)   # incoming PCM f32 frames (20ms @ 8k -> 160 samples)
         self.tts_q = queue.Queue(maxsize=16000)  # outgoing PCM f32 frames (8k)
         self.ctrl_q = queue.Queue()
         self.stop = threading.Event()
-        self.stt = STTEngine(model_size="base", device="cuda", compute_type="float16")
+        self.stt = STTEngine(model_size="small", device="cuda", compute_type="float16")
         self.llm = LLMEngine(ctx_size=2048, n_gpu_layers=20)
         self.tts = build_tts()
         self.partial_buf = []   # collect active speech
@@ -41,13 +41,13 @@ class Session:
             except queue.Empty:
                 continue
             rms = math.sqrt((frame.astype('float32')**2).mean())
-            #print(f"[session {self.session_id}] frame_rms={rms:.5f}")        
+            print(f"[session {self.session_id}] frame_rms={rms:.5f}")        
             # VAD expects 16-bit bytes for the frame
             frame_pcm16 = (np.clip(frame, -1, 1) * 32767).astype(np.int16).tobytes()
             speech, speaking, segment_done = self.vad.update(frame_pcm16)
             # DEBUG: print vad state occasionally
-            # if len(self.partial_buf) % 50 == 0:  # not to spam, only occasional
-            #     print(f"[session {self.session_id}] vad: speech={speech} speaking={speaking} segment_done={segment_done} partial_buf_len={len(self.partial_buf)}")
+            if len(self.partial_buf) % 50 == 0:  # not to spam, only occasional
+                print(f"[session {self.session_id}] vad: speech={speech} speaking={speaking} segment_done={segment_done} partial_buf_len={len(self.partial_buf)}")
 
 
             if speech:

@@ -7,7 +7,7 @@ import sounddevice as sd
 import websockets
 from audio_utils import mulaw_encode, mulaw_decode, resample_to_8k, resample_to_16k
 
-SERVER = "ws://213.173.108.5:12305/stream?session_id="
+SERVER = "ws://213.173.107.102:14537/stream?session_id="
 FRAME_MS = 20
 TARGET_SR = 8000
 FRAME_SAMPLES = int(TARGET_SR * FRAME_MS / 1000)  # 160
@@ -145,9 +145,11 @@ async def run_client(session_id: str):
         # Start stream(s)
         if mode == "duplex":
             try:
-                stream = sd.Stream(device=4, samplerate=sr, blocksize=blocksize,
+                print("tille here")
+                stream = sd.Stream(device=4, samplerate=sr, blocksize=1024,
                                    dtype='float32', channels=1, callback=duplex_callback)
                 stream.start()
+                print("stream started")
             except Exception as e:
                 print("Failed to open duplex stream:", e)
                 print("Falling back to separate streams.")
@@ -155,9 +157,9 @@ async def run_client(session_id: str):
 
         if mode == "separate":
             # input stream with callback pushing to send_q
-            in_stream = sd.InputStream(device=4, samplerate=in_sr or sr, blocksize=int((in_sr or sr) * FRAME_MS / 1000),
+            in_stream = sd.InputStream(device=4, samplerate=in_sr or sr, blocksize=1024,
                                        dtype='float32', channels=1, callback=input_callback)
-            out_stream = sd.OutputStream(device=4, samplerate=out_sr or sr, blocksize=int((out_sr or sr) * FRAME_MS / 1000),
+            out_stream = sd.OutputStream(device=4, samplerate=out_sr or sr, blocksize=1024,
                                          dtype='float32', channels=1, callback=output_callback)
             in_stream.start()
             out_stream.start()
@@ -167,15 +169,19 @@ async def run_client(session_id: str):
             seq = 0
             sent = 0
             while True:
-                pcm8 = await send_q.get()
-                mu = mulaw_encode(pcm8.astype(np.float32))
-                header = struct.pack(">IBH", seq, 0, FRAME_MS)
-                await ws.send(header + mu)
-                seq = (seq + 1) & 0xFFFFFFFF
-                sent += 1      # <-- add
-                if sent % 50 == 0:   # print every ~1s (20ms * 50)
-                    print(f"[client] sent frames={sent}, last_seq={seq}")   # <-- add
-
+                try:
+                    pcm8 = await send_q.get()
+                    mu = mulaw_encode(pcm8.astype(np.float32))
+                    header = struct.pack(">IBH", seq, 0, FRAME_MS)
+                    await ws.send(header + mu)
+                    print("send first bytes")
+                    seq = (seq + 1) & 0xFFFFFFFF
+                    sent += 1      # <-- add
+                    if sent % 50 == 0:   # print every ~1s (20ms * 50)
+                        print(f"[client] sent frames={sent}, last_seq={seq}")   # <-- add
+                except Exception as e:
+                    print(e)
+                    continue
         async def receiver():
             while True:
                 msg = await ws.recv()
@@ -195,7 +201,7 @@ async def run_client(session_id: str):
         await asyncio.gather(sender(), receiver())
 
 if __name__ == "__main__":
-    resp = requests.post("http://213.173.108.5:12305/handshake")
+    resp = requests.post("http://213.173.107.102:14537/handshake")
     sid = resp.json()["session_id"]
     print("Got session_id:", sid)
     try:

@@ -47,7 +47,7 @@ fi
 pip install "torch" "torchaudio" --extra-index-url https://download.pytorch.org/whl/cu1281 || true
 
 # Install Coqui TTS (this will pull a lot; it needs torch)
-pip install TTS
+pip install coqui-tts
 
 # Install soundfile already done earlier.
 
