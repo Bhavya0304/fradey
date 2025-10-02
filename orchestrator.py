@@ -136,6 +136,7 @@ class Session:
             try:
                 # STT
                 text = self.stt.transcribe_chunk(segment, lang="en")
+                print(text)
             except Exception as e:
                 print(f"[session {self.session_id}] STT error: {e}")
                 continue
@@ -145,6 +146,7 @@ class Session:
 
             try:
                 reply = self.llm.reply(text)
+                print(text)
             except Exception as e:
                 print(f"[session {self.session_id}] LLM error: {e}")
                 continue
