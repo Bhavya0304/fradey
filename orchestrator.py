@@ -10,7 +10,7 @@ class Session:
     def __init__(self, session_id: str):
         self.session_id = session_id
         self.in_sr = 8000
-        self.vad = VADGate(sample_rate=8000, aggressiveness=0, pause_ms=600)
+        self.vad = VADGate(sample_rate=8000, aggressiveness=2, pause_ms=400)
 
         # Queues
         self.in_q = queue.Queue(maxsize=200)    # incoming PCM f32 frames (20ms @ 8k -> 160 samples)
