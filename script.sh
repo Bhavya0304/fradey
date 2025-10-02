@@ -49,6 +49,8 @@ pip install "torch" "torchaudio" --extra-index-url https://download.pytorch.org/
 # Install Coqui TTS (this will pull a lot; it needs torch)
 pip install coqui-tts
 
+apt-get install espeak
+
 # Install soundfile already done earlier.
 
 # Install llama-cpp-python with CUDA flags (force build if needed)
