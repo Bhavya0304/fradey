@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
-WORKDIR="/workspace"
+WORKDIR="/workspace/fradey"
 VENV_DIR="$WORKDIR/venv"
 PY=python3
 
 echo "== runpod_setup: starting in $WORKDIR =="
 
-# basic apt packages
+# basic apt packages and prerequisites
 apt-get update
 apt-get install -y git build-essential cmake pkg-config libsndfile1-dev libasound2-dev \
     libssl-dev libffi-dev python3-dev python3-venv wget unzip
+apt-get install portaudio19-dev
 
 # quick GPU check
 if command -v nvidia-smi >/dev/null 2>&1; then
@@ -31,8 +32,6 @@ pip install numpy soundfile aiohttp
 # Install faster-whisper (python wrapper)
 pip install faster-whisper
 
-# Install onnxruntime-gpu if you plan to use onnx TTS or piper runtime expecting ONNX GPU
-pip install --upgrade "onnxruntime-gpu"
 
 # Install Coqui TTS (GPU-capable). This may pull large deps (torch)
 # Pick torch build that matches CUDA available. We try to auto-detect CUDA version.
@@ -45,7 +44,7 @@ fi
 # Install torch with CUDA support if possible. Default to latest stable with CUDA 11.8 fallback.
 # Using pip triple-quoted indexes may be necessary for specific cuda versions. We'll attempt generic install,
 # and if CPU-only torch is installed, user can choose to install specific wheel manually.
-pip install "torch" "torchaudio" --extra-index-url https://download.pytorch.org/whl/cu118 || true
+pip install "torch" "torchaudio" --extra-index-url https://download.pytorch.org/whl/cu1281 || true
 
 # Install Coqui TTS (this will pull a lot; it needs torch)
 pip install TTS
@@ -57,7 +56,7 @@ pip install TTS
 echo "Installing llama-cpp-python (CUDA build if possible)..."
 # Force a CMake build that tries to enable GGML_CUDA / CUBLAS if available
 export FORCE_CMAKE=1
-export CMAKE_ARGS="-DLLAMA_CUBLAS=on -DGGML_CUDA=on"
+export CMAKE_ARGS="-DGGML_CUDA=on -DGGML_CUBLAS=on"
 pip install --upgrade --no-cache-dir --force-reinstall llama-cpp-python || {
   echo "llama-cpp-python pip install failed; retrying without cuda flags..."
   unset CMAKE_ARGS
@@ -65,8 +64,6 @@ pip install --upgrade --no-cache-dir --force-reinstall llama-cpp-python || {
   pip install --upgrade --no-cache-dir --force-reinstall llama-cpp-python
 }
 
-# Install onnx tools and others used by piper if needed
-pip install onnx onnxruntime
 
 # ctranslate2 GPU wheel: try to install if available for your platform; fallback to CPU build
 echo "Attempting to install ctranslate2 with cuda support..."
@@ -76,7 +73,7 @@ pip install --upgrade ctranslate2 || echo "ctranslate2 install failed or CPU-onl
 python - <<'PY'
 import sys, importlib, pkgutil
 print("Python:", sys.version.splitlines()[0])
-for pkg in ("torch","faster_whisper","llama_cpp","TTS","onnxruntime"):
+for pkg in ("torch","faster_whisper","llama_cpp","TTS",""):
     try:
         m = importlib.import_module(pkg)
         print(f"{pkg}: OK, version:", getattr(m, '__version__', None))

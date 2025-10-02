@@ -7,7 +7,7 @@ import sounddevice as sd
 import websockets
 from audio_utils import mulaw_encode, mulaw_decode, resample_to_8k, resample_to_16k
 
-SERVER = "ws://157.157.221.29:23881/stream?session_id="
+SERVER = "ws://213.173.108.5:12305/stream?session_id="
 FRAME_MS = 20
 TARGET_SR = 8000
 FRAME_SAMPLES = int(TARGET_SR * FRAME_MS / 1000)  # 160
@@ -195,7 +195,7 @@ async def run_client(session_id: str):
         await asyncio.gather(sender(), receiver())
 
 if __name__ == "__main__":
-    resp = requests.post("http://157.157.221.29:23881/handshake")
+    resp = requests.post("http://213.173.108.5:12305/handshake")
     sid = resp.json()["session_id"]
     print("Got session_id:", sid)
     try:

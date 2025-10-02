@@ -9,12 +9,12 @@ class Session:
     def __init__(self, session_id: str):
         self.session_id = session_id
         self.in_sr = 8000
-        self.vad = VADGate(sample_rate=8000, aggressiveness=0, pause_ms=600)
-        self.in_q = queue.Queue(maxsize=200)   # incoming PCM f32 frames (20ms @ 8k -> 160 samples)
+        self.vad = VADGate(sample_rate=8000, aggressiveness=2, pause_ms=200)
+        self.in_q = queue.Queue(maxsize=16000)   # incoming PCM f32 frames (20ms @ 8k -> 160 samples)
         self.tts_q = queue.Queue(maxsize=16000)  # outgoing PCM f32 frames (8k)
         self.ctrl_q = queue.Queue()
         self.stop = threading.Event()
-        self.stt = STTEngine(model_size="small", device="cuda", compute_type="float16")
+        self.stt = STTEngine(model_size="base", device="cuda", compute_type="float16")
         self.llm = LLMEngine(ctx_size=2048, n_gpu_layers=20)
         self.tts = build_tts()
         self.partial_buf = []   # collect active speech
