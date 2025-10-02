@@ -66,14 +66,11 @@ async def stream(ws: WebSocket):
             tts_ready.clear()
             # drain available TTS frames
             while not sess.tts_q.empty():
-                print("not empty")
                 chunk = sess.tts_q.get_nowait()  # f32 mono @ 8k (20ms)
                 mu = mulaw_encode(chunk.astype(np.float32))
-                print(mu)
                 header = struct.pack(">IBH", seq, 0, 20)  # big-endian
                 try:
                     await ws.send_bytes(header + mu)
-                    print("sent")
                 except Exception:
                     return
                 seq = (seq + 1) & 0xFFFFFFFF
