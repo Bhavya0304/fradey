@@ -26,7 +26,26 @@ class Session:
         self.stt = None
         self.llm = None
         self.tts = None
+        try:
+            from stt import STTEngine
+            from llm import LLMEngine
+            from tts import build_tts
+        except Exception as e:
+            print(f"[session {self.session_id}] Failed to import model modules in worker: {e}")
+            # If imports fail, keep running but do not process segments
+            
 
+        try:
+            # Initialize models here — on this thread
+            # NOTE: if you want to force CPU for debugging, set device="cpu" here
+            self.stt = STTEngine(model_size="small", device="cuda", compute_type="float16")
+            self.llm = LLMEngine(ctx_size=2048, n_gpu_layers=20)
+            self.tts = build_tts()
+            print(f"[session {self.session_id}] models initialized in worker thread")
+        except Exception as e:
+            print(f"[session {self.session_id}] model init failed: {e}")
+            # If model init fails, don't crash the whole server — just stop processing
+            
         # Start two threads:
         #  - audio consumer (reads in_q, VAD, assembles segments)
         #  - processing worker (initializes models and processes segments sequentially)
@@ -105,26 +124,7 @@ class Session:
         Doing everything on one thread avoids cross-thread CUDA/context issues that often cause segfaults.
         """
         # Import/construct heavy objects here (on the worker thread)
-        try:
-            from stt import STTEngine
-            from llm import LLMEngine
-            from tts import build_tts
-        except Exception as e:
-            print(f"[session {self.session_id}] Failed to import model modules in worker: {e}")
-            # If imports fail, keep running but do not process segments
-            return
-
-        try:
-            # Initialize models here — on this thread
-            # NOTE: if you want to force CPU for debugging, set device="cpu" here
-            self.stt = STTEngine(model_size="small", device="cuda", compute_type="float16")
-            self.llm = LLMEngine(ctx_size=2048, n_gpu_layers=20)
-            self.tts = build_tts()
-            print(f"[session {self.session_id}] models initialized in worker thread")
-        except Exception as e:
-            print(f"[session {self.session_id}] model init failed: {e}")
-            # If model init fails, don't crash the whole server — just stop processing
-            return
+        
 
         hop = int(0.02 * self.in_sr)  # 160 samples @ 8k
         while not self.stop.is_set():
