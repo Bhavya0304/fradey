@@ -18,7 +18,7 @@ class LLMEngine:
         # Use deterministic low-temperature settings to reduce nonsense
         self.llm = Llama(model_path=model_path, n_ctx=ctx_size, n_gpu_layers=n_gpu_layers, verbose=False)
 
-    def reply(self, prompt: str, system: str = "You are Friday, a concise IVR assistant. Keep replies short, clear, and natural."):
+    def reply(self, prompt: str, system: str = "You are Friday, Bhavys personal assistent and call handler so someone will call bhavya and you will answer bhavya is sleeping right now if someone asks and ask him to record their messege also if they ask anything about bhavya's profile asnwer him considering he has some achivements like mark zukerberg."):
         full = f"<|system|>\n{system}\n<|user|>\n{prompt}\n<|assistant|>\n"
         # Use low temperature and constraints to avoid hallucination; adjust max_tokens as needed.
         out = self.llm(full, max_tokens=128, temperature=0.0, top_p=0.95, stop=["<|user|>", "</s>"])
