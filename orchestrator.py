@@ -146,7 +146,7 @@ class Session:
 
             try:
                 reply = self.llm.reply(text)
-                print(text)
+                print(reply)
             except Exception as e:
                 print(f"[session {self.session_id}] LLM error: {e}")
                 continue
