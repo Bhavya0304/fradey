@@ -49,7 +49,7 @@ class CoquiTTS:
 
     def synth(self, text: str) -> np.ndarray:
         # returns float32 array at 8k sample rate to match your pipeline
-        wav = self.tts.tts(text)
+        wav = self.tts.tts(text,speaker_name="p229")
         # wav is float32 in [-1,1]
         return resample_to_8k(np.asarray(wav, dtype=np.float32), self.sr)
 
