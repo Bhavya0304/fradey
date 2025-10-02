@@ -26,9 +26,9 @@ def pick_default_device():
         in_idx = out_idx = None
         for i, d in enumerate(devs):
             if in_idx is None and d.get('max_input_channels', 0) > 0:
-                in_idx = 4
+                in_idx = 13
             if out_idx is None and d.get('max_output_channels', 0) > 0:
-                out_idx = 4
+                out_idx = 13
             if in_idx is not None and out_idx is not None:
                 break
         return in_idx, out_idx

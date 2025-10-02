@@ -69,9 +69,9 @@ def build_tts():
         return CoquiTTS()
         
     except Exception as e:
-        print(f"[TTS] Piper not ready: {e}. Trying Coqui TTS (gpu)...")
+        print(f"[TTS] Coqui TTS not ready: {e}. Using fallback silence.")
     try:
         return PiperTTS()
     except Exception as e:
-        print(f"[TTS] Coqui TTS not ready: {e}. Using fallback silence.")
+        print(f"[TTS] Piper not ready: {e}. Trying Coqui TTS (gpu)...")
         return FallbackTTS()
