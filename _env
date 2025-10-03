@@ -1,3 +1,4 @@
 LLAMA_MODEL="./models/Meta-Llama-3.1-8B-Instruct-IQ2_M.gguf"
 #PIPER_BIN="./models/piper/piper"
 #PIPER_VOICE="./models/piper/en_US-amy-low.onnx"
+GROQ_API="YOUR GROQ API Key"

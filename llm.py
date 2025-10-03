@@ -32,7 +32,9 @@ class LLMEngineGroq:
     Set LLAMA_MODEL env var to the GGUF path.
     """
     def __init__(self):
-        self.groq = Groq(api_key="")
+
+        api_key = os.getenv("GROQ_API")
+        self.groq = Groq(api_key=api_key)
 
     def reply(self, prompt: str, system: str = "You are Friday, Bhavys personal assistent and call handler so someone will call bhavya and you will answer bhavya is sleeping right now if someone asks and ask him to record their messege also if they ask anything about bhavya's profile asnwer him considering he has some achivements like mark zukerberg. Also keep convertstaion very small and to the point"):
         chat_completion = self.groq.chat.completions.create(
