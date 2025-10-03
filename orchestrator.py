@@ -1,6 +1,7 @@
 # orchestrator.py
 import time, threading, queue, numpy as np, math
 from vad import VADGate
+import time
 # Note: import heavy libs inside the worker thread below
 # from stt import STTEngine
 # from llm import LLMEngine
@@ -28,7 +29,7 @@ class Session:
         self.tts = None
         try:
             from stt import STTEngine
-            from llm import LLMEngine
+            from llm import LLMEngine, LLMEngineGroq
             from tts import build_tts
         except Exception as e:
             print(f"[session {self.session_id}] Failed to import model modules in worker: {e}")
@@ -39,7 +40,7 @@ class Session:
             # Initialize models here — on this thread
             # NOTE: if you want to force CPU for debugging, set device="cpu" here
             self.stt = STTEngine(model_size="small", device="cuda", compute_type="float16")
-            self.llm = LLMEngine(ctx_size=2048, n_gpu_layers=20)
+            self.llm = LLMEngineGroq()
             self.tts = build_tts()
             print(f"[session {self.session_id}] models initialized in worker thread")
         except Exception as e:
@@ -135,8 +136,10 @@ class Session:
 
             try:
                 # STT
+                STT_start_time = time.perf_counter()
                 text = self.stt.transcribe_chunk(segment, lang="en")
-                print(text)
+                STT_end_time = time.perf_counter()
+                print(f"STT Time: {(STT_end_time - STT_start_time):.6f} seconds")
             except Exception as e:
                 print(f"[session {self.session_id}] STT error: {e}")
                 continue
@@ -145,19 +148,25 @@ class Session:
                 continue
 
             try:
+                LLM_start_time = time.perf_counter()
                 reply = self.llm.reply(text)
-                print(reply)
+                LLM_end_time = time.perf_counter()
+                print(f"LLM Time: {(LLM_end_time - LLM_start_time):.6f} seconds")
             except Exception as e:
                 print(f"[session {self.session_id}] LLM error: {e}")
                 continue
 
             try:
+                TTS_start_time = time.perf_counter()
                 tts_pcm_8k = self.tts.synth(reply)
+                TTS_end_time = time.perf_counter()
+                print(f"TTS Time: {(TTS_end_time - TTS_start_time):.6f} seconds")
             except Exception as e:
                 print(f"[session {self.session_id}] TTS error: {e}")
                 continue
 
             # chunk and enqueue to tts_q for sender to pick up
+            CHUNK_start_time = time.perf_counter()
             for i in range(0, len(tts_pcm_8k), hop):
                 chunk = tts_pcm_8k[i:i+hop]
                 if len(chunk) < hop:
@@ -167,7 +176,8 @@ class Session:
                 except queue.Full:
                     # if queue full, skip chunk
                     pass
-
+            CHUNK_end_time = time.perf_counter()
+            print(f"CHUNK Time: {(CHUNK_end_time - CHUNK_start_time):.6f} seconds")
             # signal available frames (preserve backward compat with your server)
             try:
                 if hasattr(self, "_on_tts_ready") and callable(self._on_tts_ready):

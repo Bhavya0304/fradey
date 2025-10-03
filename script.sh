@@ -70,12 +70,12 @@ pip install --upgrade --no-cache-dir --force-reinstall llama-cpp-python || {
 # ctranslate2 GPU wheel: try to install if available for your platform; fallback to CPU build
 echo "Attempting to install ctranslate2 with cuda support..."
 pip install --upgrade ctranslate2 || echo "ctranslate2 install failed or CPU-only wheel installed."
-
+pip install groq
 # Clean up and show versions
 python - <<'PY'
 import sys, importlib, pkgutil
 print("Python:", sys.version.splitlines()[0])
-for pkg in ("torch","faster_whisper","llama_cpp","TTS",""):
+for pkg in ("torch","faster_whisper","llama_cpp","TTS"):
     try:
         m = importlib.import_module(pkg)
         print(f"{pkg}: OK, version:", getattr(m, '__version__', None))
