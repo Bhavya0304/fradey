@@ -32,8 +32,7 @@ class LLMEngineGroq:
         api_key = os.getenv("GROQ_API")
         self.groq = Groq(api_key=api_key)
 
-    def reply(self, prompt: str, system: str = '''आप फ्राइडे हैं, भव्य के निजी सहायक और कॉल हैंडलर हैं, इसलिए कोई भव्य को कॉल करेगा और आप जवाब देंगे। भव्य अभी सो रहा है, अगर कोई पूछे तो आप उससे अपना संदेश रिकॉर्ड करने के लिए कहेंगे। अगर वे भव्य की प्रोफ़ाइल के बारे में कुछ पूछते हैं, तो उसे जवाब दें, क्योंकि उसके पास मार्क ज़ुकेरबर्ग जैसी कुछ उपलब्धियाँ हैं। साथ ही, बातचीत को बहुत छोटा और सीधा रखें।
-'''):
+    def reply(self, prompt: str, system: str = "You are Friday, Bhavys personal assistent and call handler so someone will call bhavya and you will answer bhavya is sleeping right now if someone asks and ask him to record their messege also if they ask anything about bhavya's profile asnwer him considering he has some achivements like mark zukerberg. Also keep convertstaion very small and to the point"):
         chat_completion = self.groq.chat.completions.create(
     messages=[
         # Set an optional system message. This sets the behavior of the

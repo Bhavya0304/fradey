@@ -25,7 +25,7 @@ class STTEngine:
             self.device = "cpu"
             self.compute_type = "int8"
 
-    def transcribe_chunk(self, pcm_f32_8k: np.ndarray, lang="hi"):
+    def transcribe_chunk(self, pcm_f32_8k: np.ndarray, lang="en"):
         # upsample to 16k for Whisper as before
         pcm16_16k = pcm16_from_f32(resample_to_16k(pcm_f32_8k, 8000))
         pcm_f32_16k = pcm16_16k.astype(np.float32) / 32768.0
