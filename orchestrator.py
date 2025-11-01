@@ -44,7 +44,7 @@ class Session:
             self.tts = build_tts()
             self._silence_counter = 0
             self._speech_started = False
-            self._max_segment_frames = int(30 / 0.02)  # 30s max -> 1500 frames (tweak as needed)
+            self._max_segment_frames = int(10 / 0.02)  # 30s max -> 1500 frames (tweak as needed)
             self._pause_frames = int(0.4 / 0.02)  # matches pause_ms=400 -> 20 frames at 20ms
             print(f"[session {self.session_id}] models initialized in worker thread")
         except Exception as e:
