@@ -94,7 +94,6 @@ async def stream(ws: WebSocket):
 
             # decode μ-law -> f32 (mono 8k)
             pcm_f32 = mulaw_decode(payload)
-            print(pcm_f32)
             sess.push_frame(pcm_f32)
 
     except WebSocketDisconnect:
