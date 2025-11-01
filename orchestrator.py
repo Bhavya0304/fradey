@@ -11,7 +11,7 @@ class Session:
     def __init__(self, session_id: str):
         self.session_id = session_id
         self.in_sr = 8000
-        self.vad = VADGate(sample_rate=8000, aggressiveness=2, pause_ms=400)
+        self.vad = VADGate(sample_rate=8000, aggressiveness=3, pause_ms=200)
 
         # Queues
         self.in_q = queue.Queue(maxsize=200)    # incoming PCM f32 frames (20ms @ 8k -> 160 samples)
@@ -42,6 +42,10 @@ class Session:
             self.stt = STTEngine(model_size="small", device="cuda", compute_type="float16")
             self.llm = LLMEngineGroq()
             self.tts = build_tts()
+            self._silence_counter = 0
+            self._speech_started = False
+            self._max_segment_frames = int(30 / 0.02)  # 30s max -> 1500 frames (tweak as needed)
+            self._pause_frames = int(0.4 / 0.02)  # matches pause_ms=400 -> 20 frames at 20ms
             print(f"[session {self.session_id}] models initialized in worker thread")
         except Exception as e:
             print(f"[session {self.session_id}] model init failed: {e}")
@@ -100,24 +104,41 @@ class Session:
                 # optional: log e
 
             if speech:
+                # we observed speech in this frame
                 self.partial_buf.append(frame)
+                self._speech_started = True
+                self._silence_counter = 0
+            else:
+                # no speech in this frame
+                if self._speech_started:
+                    self._silence_counter += 1
+                # if silence persisted beyond pause threshold, force segment end
+            # force segment_done if VAD says so OR our silence counter passes threshold OR segment too long
+            forced_segment = False
+            if getattr(self, "_pause_frames", None) is not None:
+                if self._silence_counter >= self._pause_frames and self._speech_started:
+                    forced_segment = True
 
-            if segment_done and len(self.partial_buf) > 0:
-                segment = np.concatenate(self.partial_buf, axis=0)
-                self.partial_buf.clear()
-                # enqueue segment for processing by the single worker thread
-                try:
-                    self.proc_q.put_nowait(segment)
-                except queue.Full:
-                    # drop the segment if worker is overwhelmed; better than blocking
-                    try:
-                        _ = self.proc_q.get_nowait()
-                    except Exception:
-                        pass
+            if segment_done or forced_segment or (len(self.partial_buf) >= self._max_segment_frames):
+                if len(self.partial_buf) > 0:
+                    segment = np.concatenate(self.partial_buf, axis=0)
+                    print(f"[{self.session_id}] DEBUG segment finalized: frames={len(segment)} samples={segment.shape} forced={forced_segment} silence_count={self._silence_counter} partial_buf_before_clear={len(self.partial_buf)}")
+                    self.partial_buf.clear()
+                    # reset VAD helper state
+                    self._speech_started = False
+                    self._silence_counter = 0
+                    # enqueue for processing
                     try:
                         self.proc_q.put_nowait(segment)
-                    except Exception:
-                        pass
+                    except queue.Full:
+                        try:
+                            _ = self.proc_q.get_nowait()
+                        except Exception:
+                            pass
+                        try:
+                            self.proc_q.put_nowait(segment)
+                        except Exception:
+                            print(f"[{self.session_id}] WARNING: proc_q full, dropped segment")
 
     def _worker_thread(self):
         """
