@@ -7,7 +7,7 @@ import sounddevice as sd
 import websockets
 from audio_utils import mulaw_encode, mulaw_decode, resample_to_8k, resample_to_16k
 
-SERVER = "ws://213.173.107.102:14537/stream?session_id="
+SERVER = "ws://213.173.98.70:18711/stream?session_id="
 FRAME_MS = 20
 TARGET_SR = 8000
 FRAME_SAMPLES = int(TARGET_SR * FRAME_MS / 1000)  # 160
@@ -58,7 +58,7 @@ async def run_client(session_id: str):
             sr = in_sr or out_sr or safe_int(sd.default.samplerate) or 48000
             mode = "separate"
             print(f"Using separate streams: in_sr={in_sr}, out_sr={out_sr}, chosen sr={sr}")
-
+        mode = "separate"
         # compute blocksize in frames for callback
         blocksize = int(sr * FRAME_MS / 1000)
 
@@ -146,7 +146,7 @@ async def run_client(session_id: str):
         if mode == "duplex":
             try:
                 print("tille here")
-                stream = sd.Stream(device=4, samplerate=sr, blocksize=1024,
+                stream = sd.Stream(device=2, samplerate=sr, blocksize=1024,
                                    dtype='float32', channels=1, callback=duplex_callback)
                 stream.start()
                 print("stream started")
@@ -157,9 +157,9 @@ async def run_client(session_id: str):
 
         if mode == "separate":
             # input stream with callback pushing to send_q
-            in_stream = sd.InputStream(device=4, samplerate=in_sr or sr, blocksize=1024,
+            in_stream = sd.InputStream(device=18, samplerate=16000 or sr, blocksize=1024,
                                        dtype='float32', channels=1, callback=input_callback)
-            out_stream = sd.OutputStream(device=4, samplerate=out_sr or sr, blocksize=1024,
+            out_stream = sd.OutputStream(device=11, samplerate=44100 or sr, blocksize=1024,
                                          dtype='float32', channels=1, callback=output_callback)
             in_stream.start()
             out_stream.start()
@@ -201,7 +201,7 @@ async def run_client(session_id: str):
         await asyncio.gather(sender(), receiver())
 
 if __name__ == "__main__":
-    resp = requests.post("http://213.173.107.102:14537/handshake")
+    resp = requests.post("http://213.173.98.70:18711/handshake")
     sid = resp.json()["session_id"]
     print("Got session_id:", sid)
     try:

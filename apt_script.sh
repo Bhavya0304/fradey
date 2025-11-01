@@ -1,4 +1,3 @@
-set -euo pipefail
 WORKDIR="/workspace/fradey"
 VENV_DIR="$WORKDIR/venv"
 PY=python3

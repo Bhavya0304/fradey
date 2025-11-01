@@ -9,8 +9,8 @@ import sounddevice as sd
 import websockets
 from audio_utils import mulaw_encode, mulaw_decode, resample_to_8k, resample_to_16k
 
-SERVER = "ws://213.173.102.224:36951/stream?session_id="
-HANDSHAKE_URL = "http://213.173.102.224:36951/handshake"
+SERVER = "ws://213.173.108.227:15397/stream?session_id="
+HANDSHAKE_URL = "http://213.173.108.227:15397/handshake"
 FRAME_MS = 20
 TARGET_SR = 8000
 FRAME_SAMPLES = int(TARGET_SR * FRAME_MS / 1000)  # 160
@@ -128,9 +128,9 @@ async def run_client(session_id: str):
                 outdata.fill(0)
 
         # start streams (input and output); prefer separate streams for simplicity
-        in_stream = sd.InputStream(device=in_dev, samplerate=stream_sr, blocksize=blocksize,
+        in_stream = sd.InputStream(device=18, samplerate=stream_sr, blocksize=blocksize,
                                    dtype='float32', channels=1, callback=input_callback)
-        out_stream = sd.OutputStream(device=out_dev, samplerate=out_sr or stream_sr, blocksize=blocksize,
+        out_stream = sd.OutputStream(device=11, samplerate=out_sr or stream_sr, blocksize=blocksize,
                                      dtype='float32', channels=1, callback=output_callback)
         in_stream.start()
         out_stream.start()
