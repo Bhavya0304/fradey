@@ -7,10 +7,10 @@ import time
 import numpy as np
 import sounddevice as sd
 import websockets
-from audio_utils import mulaw_encode, mulaw_decode, resample_to_8k, resample_to_16k
+#from audio_utils import mulaw_encode, mulaw_decode, resample_to_8k, resample_to_16k
 
-SERVER = "ws://213.173.108.227:15397/stream?session_id="
-HANDSHAKE_URL = "http://213.173.108.227:15397/handshake"
+SERVER = "ws://213.173.108.8:15664/stream?session_id="
+HANDSHAKE_URL = "http://213.173.108.8:15664/handshake"
 FRAME_MS = 20
 TARGET_SR = 8000
 FRAME_SAMPLES = int(TARGET_SR * FRAME_MS / 1000)  # 160
