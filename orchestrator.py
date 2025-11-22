@@ -169,7 +169,7 @@ class Session:
             except Exception as e:
                 print(f"[session {self.session_id}] STT error: {e}")
                 continue
-
+            print("text: " + text)
             if not text:
                 continue
 
