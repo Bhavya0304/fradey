@@ -5,7 +5,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 from fastapi.responses import JSONResponse
 from schemas import HandshakeResponse, ControlEvent
 from orchestrator import Session
-from audio_utils import f32_from_pcm16, mulaw_decode, mulaw_encode, pcm16_from_f32, resample_to_16k
+from audio_utils import f32_from_pcm16, pcm16_from_f32, resample_to_16k
 from dotenv import load_dotenv
 
 load_dotenv()
