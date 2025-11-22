@@ -5,7 +5,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 from fastapi.responses import JSONResponse
 from schemas import HandshakeResponse, ControlEvent
 from orchestrator import Session
-from audio_utils import mulaw_decode, mulaw_encode
+from audio_utils import f32_from_pcm16, mulaw_decode, mulaw_encode, pcm16_from_f32, resample_to_16k
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -66,14 +66,66 @@ async def stream(ws: WebSocket):
             tts_ready.clear()
             # drain available TTS frames
             while not sess.tts_q.empty():
-                chunk = sess.tts_q.get_nowait()  # f32 mono @ 8k (20ms)
-                mu = mulaw_encode(chunk.astype(np.float32))
-                header = struct.pack(">IBH", seq, 0, 20)  # big-endian
+                item = sess.tts_q.get_nowait()
+                # item may be either:
+                #  - numpy float32 array (mono) at 16k (preferred), OR
+                #  - tuple (pcm_f32, sr) where pcm_f32 is float32 mono and sr is its sample rate
+                if isinstance(item, tuple) and len(item) == 2:
+                    chunk_f32, in_sr = item
+                else:
+                    chunk_f32 = item
+                    in_sr = 16000  # assume 16k if not provided
+
+                # ensure numpy array dtype and shape
+                chunk_f32 = np.asarray(chunk_f32, dtype=np.float32).flatten()
+
+                # If the chunk length isn't exactly FRAME_SAMPLES (320 for 20ms @16k), resample or chunk
+                desired_samples = (20 * 16000) // 1000  # 320
+                if chunk_f32.shape[0] != desired_samples or in_sr != 16000:
+                    # Resample to 16k and ensure block size = desired_samples
+                    chunk_f32 = resample_to_16k(chunk_f32, in_sr)
+                    # If longer than desired, split into 20ms chunks
+                    if chunk_f32.shape[0] > desired_samples:
+                        # split into multiple frames (last partial frame will be padded with zeros)
+                        num_full = chunk_f32.shape[0] // desired_samples
+                        for i in range(num_full):
+                            frame = chunk_f32[i*desired_samples:(i+1)*desired_samples]
+                            pcm16 = pcm16_from_f32(frame)
+                            payload = pcm16.tobytes()
+                            header = struct.pack(">IBH", seq, 0, 20)
+                            try:
+                                await ws.send_bytes(header + payload)
+                            except Exception:
+                                return
+                            seq = (seq + 1) & 0xFFFFFFFF
+                        # handle tail
+                        tail = chunk_f32[num_full*desired_samples:]
+                        if tail.size > 0:
+                            tail_padded = np.zeros(desired_samples, dtype=np.float32)
+                            tail_padded[:tail.size] = tail
+                            pcm16 = pcm16_from_f32(tail_padded)
+                            payload = pcm16.tobytes()
+                            header = struct.pack(">IBH", seq, 0, 20)
+                            try:
+                                await ws.send_bytes(header + payload)
+                            except Exception:
+                                return
+                            seq = (seq + 1) & 0xFFFFFFFF
+                        continue
+                    else:
+                        # chunk_f32 now is exactly desired_samples
+                        pass
+
+                # normal path: chunk_f32 length == desired_samples, sr == 16k
+                pcm16 = pcm16_from_f32(chunk_f32)
+                payload = pcm16.tobytes()
+                header = struct.pack(">IBH", seq, 0, 20)
                 try:
-                    await ws.send_bytes(header + mu)
+                    await ws.send_bytes(header + payload)
                 except Exception:
                     return
                 seq = (seq + 1) & 0xFFFFFFFF
+
 
     sender_task = asyncio.create_task(sender())
 
@@ -85,17 +137,22 @@ async def stream(ws: WebSocket):
                 continue
             seq, codec, ms = struct.unpack(">IBH", data[:7])
             payload = data[7:]
-            # DEBUG: print incoming frame summary
-            
 
-            if codec != 0:
-                # unsupported codec
+# Expect codec 0 = PCM16LE @ 16000 Hz (mono)
+            if codec == 0:
+                expected_samples = (ms * 16000) // 1000  # 20ms => 320
+                expected_bytes = expected_samples * 2
+                if len(payload) != expected_bytes:
+        # If mismatch, try to handle gracefully: resample or skip
+                    print(f"[stream] payload size mismatch: got {len(payload)} expected {expected_bytes}; skipping")
+                    continue
+                pcm16 = np.frombuffer(payload, dtype=np.int16).astype(np.int16)
+                pcm_f32 = f32_from_pcm16(pcm16)  # float32 mono @ 16k
+    # push to session
+                sess.push_frame(pcm_f32)
                 continue
-
-            # decode μ-law -> f32 (mono 8k)
-            pcm_f32 = mulaw_decode(payload)
-            sess.push_frame(pcm_f32)
-
+            else:
+                continue
     except WebSocketDisconnect:
         pass
     finally:

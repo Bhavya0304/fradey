@@ -1,5 +1,6 @@
 # orchestrator.py
 import time, threading, queue, numpy as np, math
+from audio_utils import resample_to_16k
 from vad import VADGate
 import time
 # Note: import heavy libs inside the worker thread below
@@ -95,9 +96,9 @@ class Session:
 
             frame_pcm16 = (np.clip(frame, -1, 1) * 32767).astype(np.int16).tobytes()
             try:
-                print(f"[{self.session_id}] DEBUG _consume_audio: got frame len={len(frame)} dtype={frame.dtype} rms={rms:.6f} in_q={self.in_q.qsize()} partial_len={len(self.partial_buf)}")
+                #print(f"[{self.session_id}] DEBUG _consume_audio: got frame len={len(frame)} dtype={frame.dtype} rms={rms:.6f} in_q={self.in_q.qsize()} partial_len={len(self.partial_buf)}")
                 speech, speaking, segment_done = self.vad.update(frame_pcm16)
-                print(f"[{self.session_id}] DEBUG VAD -> speech={speech} speaking={speaking} segment_done={segment_done}")
+                #print(f"[{self.session_id}] DEBUG VAD -> speech={speech} speaking={speaking} segment_done={segment_done}")
             except Exception as e:
                 # If VAD errors, treat as no-speech and continue
                 speech, speaking, segment_done = False, False, False
@@ -142,23 +143,25 @@ class Session:
 
     def _worker_thread(self):
         """
-        Dedicated worker thread which:
-          - initializes STT/LLM/TTS models on this thread
-          - processes segments sequentially (STT -> LLM -> TTS)
-        Doing everything on one thread avoids cross-thread CUDA/context issues that often cause segfaults.
+        Worker: STT -> LLM -> TTS on a single thread to avoid cross-thread CUDA/context issues.
+        Produces float32 mono frames at out_sr (16 kHz) in fixed 20 ms chunks (frame_size=320).
         """
-        # Import/construct heavy objects here (on the worker thread)
-        
+        # target output sampling rate and frame size
+        out_sr = 16000
+        frame_ms = 20
+        frame_size = int((frame_ms / 1000.0) * out_sr)  # 320 samples for 20ms @ 16k
+        hop = frame_size  # no overlap, send discrete 20ms frames
 
-        hop = int(0.02 * self.in_sr)  # 160 samples @ 8k
+        # helper accessor for resampling function - assume available in module scope
+        # resample_to_16k(pcm_f32, in_sr) should exist (you provided earlier)
         while not self.stop.is_set():
             try:
                 segment = self.proc_q.get(timeout=0.1)
             except queue.Empty:
                 continue
 
+            # STT
             try:
-                # STT
                 STT_start_time = time.perf_counter()
                 text = self.stt.transcribe_chunk(segment, lang="en")
                 STT_end_time = time.perf_counter()
@@ -170,6 +173,7 @@ class Session:
             if not text:
                 continue
 
+            # LLM
             try:
                 LLM_start_time = time.perf_counter()
                 reply = self.llm.reply(text)
@@ -179,35 +183,89 @@ class Session:
                 print(f"[session {self.session_id}] LLM error: {e}")
                 continue
 
+            # TTS
             try:
                 TTS_start_time = time.perf_counter()
-                tts_pcm_8k = self.tts.synth(reply)
+                # Prefer TTS that can be asked to synthesize at 16k. If your TTS supports a sr param, use it.
+                # Example: tts_pcm = self.tts.synth(reply, sr=out_sr)
+                # Otherwise, we accept whatever it returns and resample below.
+                tts_out = self.tts.synth(reply)   # may be np.ndarray float32 mono at unknown sr
                 TTS_end_time = time.perf_counter()
                 print(f"TTS Time: {(TTS_end_time - TTS_start_time):.6f} seconds")
             except Exception as e:
                 print(f"[session {self.session_id}] TTS error: {e}")
                 continue
 
-            # chunk and enqueue to tts_q for sender to pick up
-            CHUNK_start_time = time.perf_counter()
-            for i in range(0, len(tts_pcm_8k), hop):
-                chunk = tts_pcm_8k[i:i+hop]
-                if len(chunk) < hop:
-                    chunk = np.pad(chunk, (0, hop - len(chunk)))
+            # Normalize to numpy float32 mono
+            try:
+                tts_pcm = np.asarray(tts_out, dtype=np.float32).flatten()
+            except Exception as e:
+                print(f"[session {self.session_id}] TTS output conversion error: {e}")
+                continue
+
+            # Determine source sample rate for TTS output if available, fallback heuristic to 8k
+            tts_sr = None
+            # Try common attributes
+            if hasattr(self.tts, "sample_rate"):
+                tts_sr = getattr(self.tts, "sample_rate")
+            elif hasattr(self.tts, "sr"):
+                tts_sr = getattr(self.tts, "sr")
+            # If still unknown, try heuristic: if length is small and likely 8k-based
+            if tts_sr is None:
+                # try to guess: if last chunk length divisible by 160 -> maybe 8k; divisible by 320 -> maybe 16k
+                # This is a heuristic only; prefer explicit tts.sample_rate on your TTS class.
+                if tts_pcm.size % 320 == 0:
+                    tts_sr = out_sr
+                elif tts_pcm.size % 160 == 0:
+                    tts_sr = 8000
+                else:
+                    # default guess: 8000 (your previous code used 8k)
+                    tts_sr = 8000
+
+            # Resample to out_sr (16k) if needed
+            if int(tts_sr) != out_sr:
                 try:
-                    self.tts_q.put(chunk, timeout=1.0)
+                    tts_pcm = resample_to_16k(tts_pcm, int(tts_sr))
+                except Exception as e:
+                    print(f"[session {self.session_id}] resample_to_16k error: {e}")
+                    continue
+
+            # Ensure float32 range is reasonable (-1..1)
+            if tts_pcm.dtype != np.float32:
+                tts_pcm = tts_pcm.astype(np.float32)
+            # If values look large (int16 miscast), normalize:
+            if np.max(np.abs(tts_pcm)) > 10.0:
+                # likely int16 range; scale down
+                tts_pcm = np.clip(tts_pcm / 32768.0, -1.0, 1.0)
+
+            # Chunk into fixed 20ms frames (frame_size) and push to tts_q
+            CHUNK_start_time = time.perf_counter()
+            total_samples = tts_pcm.shape[0]
+            # iterate in frame_size steps and pad the last frame if needed
+            for start in range(0, total_samples, hop):
+                frame = tts_pcm[start:start + frame_size]
+                if frame.shape[0] < frame_size:
+                    # pad with zeros to exact frame_size
+                    pad = np.zeros(frame_size - frame.shape[0], dtype=np.float32)
+                    frame = np.concatenate((frame, pad))
+                # Non-blocking push with timeout; drop if full
+                try:
+                    # push the numpy array (float32, length frame_size). Sender expects float32 arrays.
+                    self.tts_q.put(frame, timeout=0.5)
                 except queue.Full:
-                    # if queue full, skip chunk
-                    pass
+                    # queue full; drop this frame to avoid blocking worker
+                    print(f"[session {self.session_id}] tts_q full, dropping frame")
+                    continue
             CHUNK_end_time = time.perf_counter()
             print(f"CHUNK Time: {(CHUNK_end_time - CHUNK_start_time):.6f} seconds")
-            # signal available frames (preserve backward compat with your server)
+
+            # signal sender that TTS frames are available
             try:
                 if hasattr(self, "_on_tts_ready") and callable(self._on_tts_ready):
                     self._on_tts_ready()
             except Exception as e:
-                # don't let signaling kill the worker
                 print(f"[session {self.session_id}] on_tts_ready error: {e}")
+
 
     # optional: cleanup helper
     def shutdown(self):
