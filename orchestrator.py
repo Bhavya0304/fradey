@@ -96,9 +96,9 @@ class Session:
 
             frame_pcm16 = (np.clip(frame, -1, 1) * 32767).astype(np.int16).tobytes()
             try:
-                print(f"[{self.session_id}] DEBUG _consume_audio: got frame len={len(frame)} dtype={frame.dtype} rms={rms:.6f} in_q={self.in_q.qsize()} partial_len={len(self.partial_buf)}")
+                #print(f"[{self.session_id}] DEBUG _consume_audio: got frame len={len(frame)} dtype={frame.dtype} rms={rms:.6f} in_q={self.in_q.qsize()} partial_len={len(self.partial_buf)}")
                 speech, speaking, segment_done = self.vad.update(frame_pcm16)
-                print(f"[{self.session_id}] DEBUG VAD -> speech={speech} speaking={speaking} segment_done={segment_done}")
+                #print(f"[{self.session_id}] DEBUG VAD -> speech={speech} speaking={speaking} segment_done={segment_done}")
             except Exception as e:
                 # If VAD errors, treat as no-speech and continue
                 speech, speaking, segment_done = False, False, False
