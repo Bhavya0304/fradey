@@ -170,8 +170,8 @@ class Session:
                 print(f"[session {self.session_id}] STT error: {e}")
                 continue
             print("text: " + text)
-            if not text:
-                continue
+            # if not text:
+            #     continue
 
             # LLM
             try:
